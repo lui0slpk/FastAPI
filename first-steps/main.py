@@ -9,6 +9,7 @@ To run the app we have two commands:
 
 from fastapi import FastAPI, Query, Body, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 
 app = FastAPI(title="Mini Blog")
 
@@ -20,14 +21,14 @@ BLOG_POST = [
 
 class PostBase(BaseModel):
     title: str
-    content: str
+    content: Optional[str] = "Contenido no disponible"
 
 class PostCreate(PostBase):
     pass
 
 class PostUpdate(BaseModel):
     title: str
-    content: str
+    content: Optional[str] = None
 
 @app.get("/")
 def home():
