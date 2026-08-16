@@ -8,6 +8,7 @@ To run the app we have two commands:
 """
 
 from fastapi import FastAPI, Query, Body, HTTPException
+from pydantic import BaseModel
 
 app = FastAPI(title="Mini Blog")
 
@@ -16,6 +17,17 @@ BLOG_POST = [
     {"id": 2, "title": "Mi segundo post con FastAPI", "content": "Mi segundo post usando FastAPI"},
     {"id": 3, "title": "DJango vs FastAPI", "content": "FastAPI es más rápido"},
 ]
+
+class PostBase(BaseModel):
+    title: str
+    content: str
+
+class PostCreate(PostBase):
+    pass
+
+class PostUpdate(BaseModel):
+    title: str
+    content: str
 
 @app.get("/")
 def home():
@@ -48,28 +60,21 @@ def get_post(post_id: int, include_content: bool = Query(default=True, descripti
     return {"error": "Post no encontrado"}
 
 @app.post("/posts")
-# When using (...) we are telling to FastAPI to require the body. 
-# This (...) means that there's going to be some data, but we don't know what it would be
-def create_post(post: dict = Body(...)):
-    if "title" not in post or "content" not in post:
-        return {"error": "Title y Content son requeridos"}
-    
-    if not str(post["title"]).strip():
-        return {"error": "Title no puede estar vacío"}
-    
+def create_post(post: PostCreate):
     new_id = (BLOG_POST[-1]["id"]+1) if BLOG_POST else 1
-    new_post = {"id": new_id, "title": post["title"], "content": post["content"]}
+    new_post = {"id": new_id, "title": post.title, "content": post.content}
     BLOG_POST.append(new_post)
     
     return {"message": "Un nuevo post se ha creado", "data": new_post}
 
 
 @app.put("/posts/{post_id}")
-def update_post(post_id: int, data: dict = Body(...)):
+def update_post(post_id: int, data: PostUpdate):
     for post in BLOG_POST:
         if post["id"] == post_id:
-            if "title" in data: post["title"] = data["title"]
-            if "content" in data: post["content"] = data["content"]
+            playload = data.model_dump(exclude_unset=True)
+            if "title" in playload: post["title"] = playload["title"]
+            if "content" in playload: post["content"] = playload["content"]
             return {"message": "Se ha actualizado el post", "data": post}
 
     raise HTTPException(status_code=404, detail="Post no encontrado")
