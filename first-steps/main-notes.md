@@ -54,7 +54,27 @@ class PostBase(BaseModel):
     content: Optional[str] = "Contenido no disponible"
 
 class PostCreate(PostBase):
-    pass
+    title: str = Field(
+        ...,
+        min_length=3,
+        max_length=30,
+        description="Titulo del post (Mínimo 3 caracteres, máximo 30)",
+        examples=["Mi primer post con FastAPI"]
+    )
+    content: Optional[str] = Field(
+        default="Contenido no disponible",
+        min_length=1,
+        max_length=500,
+        description="Contenido del post (mínimo 1 carácter máx 500)"
+    )
+
+    @field_validator("title")
+    @classmethod
+    def not_words_allowed(cls, value: str) -> str:
+        for word in not_allowed_words:
+            if word in value.lower():
+                raise ValueError(f"El título no puede contener la palabra '{word}'")
+        return value
 
 class PostUpdate(BaseModel):
     title: str
@@ -67,7 +87,81 @@ class PostUpdate(BaseModel):
 - `title: str` means `title` must be a string.
 - `content: Optional[str] = "Contenido no disponible"` means content is optional and has a default value.
 - `PostCreate` inherits from `PostBase`, so it has the same fields.
+- `Field(...)` adds automatic validation rules such as `min_length`, `max_length`, descriptions, and examples.
+- `@field_validator("title")` allows us to define custom rules that are not covered by standard Pydantic validation.
 - `PostUpdate` is used when updating a post partially, so some fields may be absent.
+
+### Automatic validations
+
+These are validations that Pydantic applies automatically because they are declared directly in the field definition.
+
+```python
+title: str = Field(
+    ...,
+    min_length=3,
+    max_length=30,
+    description="Titulo del post (Mínimo 3 caracteres, máximo 30)",
+    examples=["Mi primer post con FastAPI"]
+)
+
+content: Optional[str] = Field(
+    default="Contenido no disponible",
+    min_length=1,
+    max_length=500,
+    description="Contenido del post (mínimo 1 carácter máx 500)"
+)
+```
+
+### What this does
+
+- `min_length=3` ensures the title is at least 3 characters long.
+- `max_length=30` restricts the title to a maximum of 30 characters.
+- `min_length=1` ensures content cannot be empty.
+- `max_length=500` limits the total size of the content.
+- `description` and `examples` improve the auto-generated documentation in Swagger/OpenAPI.
+
+These validations are automatic because they are built into the field definition itself.
+
+### Custom validation example
+
+In this project, a list of forbidden words is defined:
+
+```python
+not_allowed_words = (
+    "idiota",
+    "estúpido",
+    "imbécil",
+    "pendejo",
+    "cabron",
+    "mierda",
+    "puta",
+    "puto",
+    "coño",
+    "joder"
+)
+```
+
+Then the custom validator checks whether the title contains any of those words:
+
+```python
+@field_validator("title")
+@classmethod
+def not_words_allowed(cls, value: str) -> str:
+    for word in not_allowed_words:
+        if word in value.lower():
+            raise ValueError(f"El título no puede contener la palabra '{word}'")
+    return value
+```
+
+### Why this matters
+
+This is a very useful pattern in FastAPI because it lets you validate business rules before the data is stored or processed. For example:
+
+- minimum and maximum length
+- invalid forbidden words
+- custom rules based on specific application logic
+
+So the API does not only validate types, but also the meaning of the data.
 
 This is one of the most important parts of FastAPI: request data is validated before the function runs.
 

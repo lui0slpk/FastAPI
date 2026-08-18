@@ -8,7 +8,7 @@ To run the app we have two commands:
 """
 
 from fastapi import FastAPI, Query, Body, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 app = FastAPI(title="Mini Blog")
@@ -19,12 +19,47 @@ BLOG_POST = [
     {"id": 3, "title": "DJango vs FastAPI", "content": "FastAPI es más rápido"},
 ]
 
+not_allowed_words = (
+    "idiota",
+    "estúpido",
+    "imbécil",
+    "pendejo",
+    "cabron",
+    "mierda",
+    "puta",
+    "puto",
+    "coño",
+    "joder"
+)
+
+
 class PostBase(BaseModel):
     title: str
     content: Optional[str] = "Contenido no disponible"
 
 class PostCreate(PostBase):
-    pass
+    title: str = Field( # Validaciones automáticas
+        ...,
+        min_length=3,
+        max_length=30,
+        description="Titulo del post (Mínimo 3 carateres, máximo 30)",
+        examples=["Mi primer post con FastAPI"]
+    )
+    content: Optional[str] = Field(
+        default="Contenido no disponible",
+        min_length=1,
+        max_length=500,
+        description="Contenido del post (mínimo 1 caracter máx 500)",
+        examples=["Este es un contenido válido del post porque tiene más de 1 caracter"]
+    )
+    
+    @field_validator("title") # Validaciones personalizadas
+    @classmethod
+    def not_words_allowed(cls, value: str) -> str:
+        for word in not_allowed_words:
+            if word in value.lower():
+                raise ValueError(f"El título no puede contener la palabra '{word}'")
+        return value
 
 class PostUpdate(BaseModel):
     title: str
