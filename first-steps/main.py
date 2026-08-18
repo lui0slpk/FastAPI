@@ -9,7 +9,7 @@ To run the app we have two commands:
 
 from fastapi import FastAPI, Query, Body, HTTPException
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from typing import Optional, List, Union
 
 app = FastAPI(title="Mini Blog")
 
@@ -35,7 +35,7 @@ not_allowed_words = (
 
 class PostBase(BaseModel):
     title: str
-    content: Optional[str] = "Contenido no disponible"
+    content: str
 
 class PostCreate(PostBase):
     title: str = Field( # Validaciones automáticas
@@ -65,35 +65,36 @@ class PostUpdate(BaseModel):
     title: str
     content: Optional[str] = None
 
+class PostPublic(PostBase): # This will be our response model
+    id: int
+
+class PostSummary(BaseModel): # This will be our response model
+    id: int
+    title: str
+
 @app.get("/")
 def home():
     return {'message': 'Bienvenidos a Mini Blog por Luis'}
 
 # -------------- QUERY PARAMETER ---------------
-@app.get("/posts")
+@app.get("/posts", response_model= List[PostPublic]) # Our endpoint will return a PostPublic list with all its attributes
 def list_posts(query: str | None = Query(default=None, description="Texto para buscar por título")):
-    if query:
-        results = [post for post in BLOG_POST if query.lower() in post["title"].lower()]
-        
-        # for post in BLOG_POST:
-        #     if query.lower() in post["title"].lower():
-        #         results.append(post)        
-        
-        return {"data": results, "query": query}
+    if query:        
+        return [post for post in BLOG_POST if query.lower() in post["title"].lower()] # This will return list, so it's estructure it's the same of PostPublic
 
-    return {"data": BLOG_POST}
+    return BLOG_POST # Here, we will return a list, as our response model is a PostPublic list
 
 # ------------- PATH PARAMETER --------------
-@app.get("/posts/{post_id}")
+@app.get("/posts/{post_id}", response_model= Union[PostPublic, PostSummary], response_description= "Post encontrado") # Union will let FastAPI validate the two of the response modelss
 def get_post(post_id: int, include_content: bool = Query(default=True, description="Mostrar contenido")):
     for post in BLOG_POST:
         if post["id"] == post_id:
             if not include_content:
-                return {"id": post["id"], "title": post["title"]}
+                return {"id": post["id"], "title": post["title"]} # It returns a dictionary with PostSummary type in case that include_content equals False
             
-            return {"data": post}
+            return post # It returns a dictionary with Post PostPublic type
     
-    return {"error": "Post no encontrado"}
+    return HTTPException(status_code=404, detail="Post no encontrado")
 
 @app.post("/posts")
 def create_post(post: PostCreate):
