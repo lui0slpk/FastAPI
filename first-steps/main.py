@@ -65,7 +65,7 @@ class PostUpdate(BaseModel):
     title: str
     content: Optional[str] = None
 
-class PostPublic(PostBase): # This will be our response model
+class PostPublic(PostBase): # This will be our response model, it's like a map of what we want to return
     id: int
 
 class PostSummary(BaseModel): # This will be our response model
@@ -96,23 +96,25 @@ def get_post(post_id: int, include_content: bool = Query(default=True, descripti
     
     return HTTPException(status_code=404, detail="Post no encontrado")
 
-@app.post("/posts")
+@app.post("/posts", response_model=PostPublic, response_description= "Nuevo post creado")
 def create_post(post: PostCreate):
     new_id = (BLOG_POST[-1]["id"]+1) if BLOG_POST else 1
     new_post = {"id": new_id, "title": post.title, "content": post.content}
     BLOG_POST.append(new_post)
     
-    return {"message": "Un nuevo post se ha creado", "data": new_post}
+    return new_post
+    # return {"message": "Un nuevo post se ha creado", "data": new_post}
 
 
-@app.put("/posts/{post_id}")
+@app.put("/posts/{post_id}", response_model=PostPublic, response_description= "Post actualizado", response_model_exclude_none=True)
 def update_post(post_id: int, data: PostUpdate):
     for post in BLOG_POST:
         if post["id"] == post_id:
             playload = data.model_dump(exclude_unset=True)
             if "title" in playload: post["title"] = playload["title"]
             if "content" in playload: post["content"] = playload["content"]
-            return {"message": "Se ha actualizado el post", "data": post}
+            return post
+            # return {"message": "Se ha actualizado el post", "data": post}
 
     raise HTTPException(status_code=404, detail="Post no encontrado")
 

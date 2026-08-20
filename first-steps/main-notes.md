@@ -10,8 +10,8 @@ A FastAPI app is created with `FastAPI()` and can receive metadata such as the t
 
 ```python
 from fastapi import FastAPI, Query, Body, HTTPException
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Union
 
 app = FastAPI(title="Mini Blog")
 ```
@@ -51,7 +51,7 @@ Pydantic is a validation library used to define the structure of request bodies 
 ```python
 class PostBase(BaseModel):
     title: str
-    content: Optional[str] = "Contenido no disponible"
+    content: str
 
 class PostCreate(PostBase):
     title: str = Field(
@@ -65,7 +65,8 @@ class PostCreate(PostBase):
         default="Contenido no disponible",
         min_length=1,
         max_length=500,
-        description="Contenido del post (mínimo 1 carácter máx 500)"
+        description="Contenido del post (mínimo 1 carácter máx 500)",
+        examples=["Este es un contenido válido del post porque tiene más de 1 caracter"]
     )
 
     @field_validator("title")
@@ -79,17 +80,25 @@ class PostCreate(PostBase):
 class PostUpdate(BaseModel):
     title: str
     content: Optional[str] = None
+
+class PostPublic(PostBase):
+    id: int
+
+class PostSummary(BaseModel):
+    id: int
+    title: str
 ```
 
 ### Key ideas
 
 - `BaseModel` is the base class from which request models inherit.
 - `title: str` means `title` must be a string.
-- `content: Optional[str] = "Contenido no disponible"` means content is optional and has a default value.
-- `PostCreate` inherits from `PostBase`, so it has the same fields.
+- `content: str` in `PostBase` means the content is required at the base level.
+- `PostCreate` inherits from `PostBase`, so it has the same fields and adds stricter validations.
 - `Field(...)` adds automatic validation rules such as `min_length`, `max_length`, descriptions, and examples.
 - `@field_validator("title")` allows us to define custom rules that are not covered by standard Pydantic validation.
 - `PostUpdate` is used when updating a post partially, so some fields may be absent.
+- `PostPublic` and `PostSummary` are response models: they define the shape of the data returned by the API.
 
 ### Automatic validations
 
@@ -167,7 +176,36 @@ This is one of the most important parts of FastAPI: request data is validated be
 
 ---
 
-## 4. Query parameters
+## 4. Response models
+
+FastAPI can define the exact structure of the JSON response using `response_model`.
+
+```python
+@app.get("/posts", response_model=List[PostPublic])
+def list_posts(query: str | None = Query(default=None, description="Texto para buscar por título")):
+    if query:
+        return [post for post in BLOG_POST if query.lower() in post["title"].lower()]
+    return BLOG_POST
+```
+
+```python
+@app.get("/posts/{post_id}", response_model=Union[PostPublic, PostSummary])
+def get_post(post_id: int, include_content: bool = Query(default=True, description="Mostrar contenido")):
+    ...
+```
+
+### Why this is useful
+
+- It documents the API response clearly.
+- It validates that the returned data matches the expected structure.
+- It helps Swagger/OpenAPI generate clean schemas.
+- In this project, `PostPublic` includes `id`, `title`, and `content`, while `PostSummary` only returns `id` and `title` when `include_content=false`.
+
+This pattern shows how FastAPI combines request validation with response serialization.
+
+---
+
+## 5. Query parameters
 
 Query parameters are values sent in the URL after `?`.
 
