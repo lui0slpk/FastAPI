@@ -8,7 +8,7 @@ To run the app we have two commands:
 """
 
 from fastapi import FastAPI, Query, Body, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Union
 
 app = FastAPI(title="Mini Blog")
@@ -32,13 +32,31 @@ not_allowed_words = (
     "joder"
 )
 
+class Tag(BaseModel):
+    name: str = Field(..., min_length=2, max_length=30, description="Nombre de la etiqueta")
+
+class Author(BaseModel):
+    name: str = Field(
+        ...,
+        min_length=3,
+        max_length=20,
+        description="Nombre del autor del post",
+        examples=["John Doe"]
+    )
+    email: EmailStr = Field(
+        ...,
+        description="Correo electrónico del usuario",
+        examples=["johndoe@example.com"]
+    )
 
 class PostBase(BaseModel):
     title: str
     content: str
+    tags: Optional[List[Tag]] = []
+    authors: Optional[List[Author]] = None
 
 class PostCreate(PostBase):
-    title: str = Field( # Validaciones automáticas
+    title: str = Field( # Automatic validations
         ...,
         min_length=3,
         max_length=30,
@@ -52,10 +70,12 @@ class PostCreate(PostBase):
         description="Contenido del post (mínimo 1 caracter máx 500)",
         examples=["Este es un contenido válido del post porque tiene más de 1 caracter"]
     )
+    tags: List[Tag] = []
+    authors: list[Author] = None # En el nuevo python, usar list en lugar de List para tipar los datos, es más usado, además no hace falta importar librerias como Typing
     
-    @field_validator("title") # Validaciones personalizadas
-    @classmethod
-    def not_words_allowed(cls, value: str) -> str:
+    @field_validator("title") # Custom validations | "title" is the data that we want to validate
+    @classmethod # This will allow to each class to inherit this validation
+    def not_words_allowed(cls, value: str) -> str: # This will recieve cls instead of self
         for word in not_allowed_words:
             if word in value.lower():
                 raise ValueError(f"El título no puede contener la palabra '{word}'")
@@ -99,7 +119,13 @@ def get_post(post_id: int, include_content: bool = Query(default=True, descripti
 @app.post("/posts", response_model=PostPublic, response_description= "Nuevo post creado")
 def create_post(post: PostCreate):
     new_id = (BLOG_POST[-1]["id"]+1) if BLOG_POST else 1
-    new_post = {"id": new_id, "title": post.title, "content": post.content}
+    new_post = {"id": new_id,
+                "authors": [author.model_dump() for author in post.authors] if post.authors else None,
+                "title": post.title,
+                "content": post.content,
+                "tags": [tag.model_dump() for tag in post.tags] # Here, post is an instance of PostCreate, which has tags attribute, so tag will be an instance of post
+                }
+    # Remember that x.model_dump() will return an object/dict of the model
     BLOG_POST.append(new_post)
     
     return new_post

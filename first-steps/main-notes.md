@@ -49,25 +49,46 @@ BLOG_POST = [
 Pydantic is a validation library used to define the structure of request bodies and automatically validate incoming data.
 
 ```python
+class Tag(BaseModel):
+    name: str = Field(..., min_length=2, max_length=30, description="Nombre de la etiqueta")
+
+class Author(BaseModel):
+    name: str = Field(
+        ...,
+        min_length=3,
+        max_length=20,
+        description="Nombre del autor del post",
+        examples=["John Doe"]
+    )
+    email: EmailStr = Field(
+        ...,
+        description="Correo electrónico del usuario",
+        examples=["johndoe@example.com"]
+    )
+
 class PostBase(BaseModel):
     title: str
     content: str
+    tags: Optional[List[Tag]] = []
+    authors: Optional[List[Author]] = None
 
 class PostCreate(PostBase):
     title: str = Field(
         ...,
         min_length=3,
         max_length=30,
-        description="Titulo del post (Mínimo 3 caracteres, máximo 30)",
+        description="Titulo del post (Mínimo 3 carateres, máximo 30)",
         examples=["Mi primer post con FastAPI"]
     )
     content: Optional[str] = Field(
         default="Contenido no disponible",
         min_length=1,
         max_length=500,
-        description="Contenido del post (mínimo 1 carácter máx 500)",
+        description="Contenido del post (mínimo 1 caracter máx 500)",
         examples=["Este es un contenido válido del post porque tiene más de 1 caracter"]
     )
+    tags: List[Tag] = []
+    authors: list[Author] = None
 
     @field_validator("title")
     @classmethod
@@ -91,25 +112,23 @@ class PostSummary(BaseModel):
 
 ### Key ideas
 
-- `BaseModel` is the base class from which request models inherit.
-- `title: str` means `title` must be a string.
-- `content: str` in `PostBase` means the content is required at the base level.
-- `PostCreate` inherits from `PostBase`, so it has the same fields and adds stricter validations.
-- `Field(...)` adds automatic validation rules such as `min_length`, `max_length`, descriptions, and examples.
-- `@field_validator("title")` allows us to define custom rules that are not covered by standard Pydantic validation.
-- `PostUpdate` is used when updating a post partially, so some fields may be absent.
-- `PostPublic` and `PostSummary` are response models: they define the shape of the data returned by the API.
+- `Tag` and `Author` are nested models used inside a post.
+- `EmailStr` automatically validates that the email follows a correct email format.
+- `tags` contains a list of tags with validation for name length.
+- `authors` is a list of authors, and each author includes a valid `email`.
+- `PostCreate` inherits from `PostBase` and adds automatic validation with `Field(...)` and custom validation with `@field_validator`.
+- `PostPublic` and `PostSummary` define the expected response structure.
 
 ### Automatic validations
 
-These are validations that Pydantic applies automatically because they are declared directly in the field definition.
+These are validations applied directly by Pydantic from the field definition.
 
 ```python
 title: str = Field(
     ...,
     min_length=3,
     max_length=30,
-    description="Titulo del post (Mínimo 3 caracteres, máximo 30)",
+    description="Titulo del post (Mínimo 3 carateres, máximo 30)",
     examples=["Mi primer post con FastAPI"]
 )
 
@@ -117,23 +136,23 @@ content: Optional[str] = Field(
     default="Contenido no disponible",
     min_length=1,
     max_length=500,
-    description="Contenido del post (mínimo 1 carácter máx 500)"
+    description="Contenido del post (mínimo 1 caracter máx 500)",
+    examples=["Este es un contenido válido del post porque tiene más de 1 caracter"]
 )
 ```
 
 ### What this does
 
-- `min_length=3` ensures the title is at least 3 characters long.
-- `max_length=30` restricts the title to a maximum of 30 characters.
-- `min_length=1` ensures content cannot be empty.
-- `max_length=500` limits the total size of the content.
-- `description` and `examples` improve the auto-generated documentation in Swagger/OpenAPI.
-
-These validations are automatic because they are built into the field definition itself.
+- `min_length=3` ensures the title has at least 3 characters.
+- `max_length=30` limits the title length.
+- `min_length=1` prevents empty content.
+- `max_length=500` caps the content length.
+- `EmailStr` validates email addresses automatically.
+- `Field` also improves the generated Swagger docs with descriptions and examples.
 
 ### Custom validation example
 
-In this project, a list of forbidden words is defined:
+This project also checks that certain words are not allowed in the title.
 
 ```python
 not_allowed_words = (
@@ -150,8 +169,6 @@ not_allowed_words = (
 )
 ```
 
-Then the custom validator checks whether the title contains any of those words:
-
 ```python
 @field_validator("title")
 @classmethod
@@ -162,23 +179,13 @@ def not_words_allowed(cls, value: str) -> str:
     return value
 ```
 
-### Why this matters
-
-This is a very useful pattern in FastAPI because it lets you validate business rules before the data is stored or processed. For example:
-
-- minimum and maximum length
-- invalid forbidden words
-- custom rules based on specific application logic
-
-So the API does not only validate types, but also the meaning of the data.
-
-This is one of the most important parts of FastAPI: request data is validated before the function runs.
+This is a custom business rule: even when the data type is valid, the app rejects content that violates the project rules.
 
 ---
 
 ## 4. Response models
 
-FastAPI can define the exact structure of the JSON response using `response_model`.
+FastAPI uses `response_model` to define the shape of the API response.
 
 ```python
 @app.get("/posts", response_model=List[PostPublic])
@@ -189,19 +196,17 @@ def list_posts(query: str | None = Query(default=None, description="Texto para b
 ```
 
 ```python
-@app.get("/posts/{post_id}", response_model=Union[PostPublic, PostSummary])
+@app.get("/posts/{post_id}", response_model=Union[PostPublic, PostSummary], response_description="Post encontrado")
 def get_post(post_id: int, include_content: bool = Query(default=True, description="Mostrar contenido")):
     ...
 ```
 
 ### Why this is useful
 
-- It documents the API response clearly.
-- It validates that the returned data matches the expected structure.
-- It helps Swagger/OpenAPI generate clean schemas.
-- In this project, `PostPublic` includes `id`, `title`, and `content`, while `PostSummary` only returns `id` and `title` when `include_content=false`.
-
-This pattern shows how FastAPI combines request validation with response serialization.
+- It documents the response structure clearly.
+- It validates that the return value matches the expected schema.
+- It improves Swagger/OpenAPI documentation.
+- It allows different shapes depending on the endpoint logic, such as returning a summary without content.
 
 ---
 
