@@ -9,8 +9,8 @@ This file summarizes the logic and patterns used in the FastAPI app in `main.py`
 A FastAPI app is created with `FastAPI()` and can receive metadata such as the title.
 
 ```python
-from fastapi import FastAPI, Query, Body, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from fastapi import FastAPI, Query, Body, HTTPException, Path
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Union
 
 app = FastAPI(title="Mini Blog")
@@ -197,7 +197,16 @@ def list_posts(query: str | None = Query(default=None, description="Texto para b
 
 ```python
 @app.get("/posts/{post_id}", response_model=Union[PostPublic, PostSummary], response_description="Post encontrado")
-def get_post(post_id: int, include_content: bool = Query(default=True, description="Mostrar contenido")):
+def get_post(
+    post_id: int = Path(
+        ...,
+        ge=1,
+        title="ID del post",
+        description="Identificador entero del post. Debe ser mayor a 1",
+        example=1
+    ),
+    include_content: bool = Query(default=True, description="Mostrar contenido")
+):
     ...
 ```
 
@@ -207,6 +216,7 @@ def get_post(post_id: int, include_content: bool = Query(default=True, descripti
 - It validates that the return value matches the expected schema.
 - It improves Swagger/OpenAPI documentation.
 - It allows different shapes depending on the endpoint logic, such as returning a summary without content.
+- `Path(...)` adds validation on path parameters, for example `ge=1` ensures IDs are positive integers.
 
 ---
 
@@ -247,7 +257,16 @@ Path parameters are variables included in the URL path.
 
 ```python
 @app.get("/posts/{post_id}")
-def get_post(post_id: int, include_content: bool = Query(default=True, description="Mostrar contenido")):
+def get_post(
+    post_id: int = Path(
+        ...,
+        ge=1,
+        title="ID del post",
+        description="Identificador entero del post. Debe ser mayor a 1",
+        example=1
+    ),
+    include_content: bool = Query(default=True, description="Mostrar contenido")
+):
     for post in BLOG_POST:
         if post["id"] == post_id:
             if not include_content:
@@ -262,6 +281,7 @@ def get_post(post_id: int, include_content: bool = Query(default=True, descripti
 
 - `post_id` is extracted from the URL, for example `/posts/2`.
 - FastAPI converts it to `int` because the type is `int`.
+- `Path(...)` adds validation to the route parameter, such as `ge=1` meaning the ID must be greater than or equal to 1.
 - `include_content` is a boolean query parameter, such as `?include_content=false`.
 - If the post is found, it returns the object; otherwise, it returns an error.
 

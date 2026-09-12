@@ -7,7 +7,7 @@ To run the app we have two commands:
     - uvicorn main:app --reload || Also we can change the run port using "--port 4242"
 """
 
-from fastapi import FastAPI, Query, Body, HTTPException
+from fastapi import FastAPI, Query, Body, HTTPException, Path
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Union
 
@@ -52,7 +52,7 @@ class Author(BaseModel):
 class PostBase(BaseModel):
     title: str
     content: str
-    tags: Optional[List[Tag]] = []
+    tags: Optional[List[Tag]] = Field(default_factory=list)
     authors: Optional[List[Author]] = None
 
 class PostCreate(PostBase):
@@ -70,7 +70,7 @@ class PostCreate(PostBase):
         description="Contenido del post (mínimo 1 caracter máx 500)",
         examples=["Este es un contenido válido del post porque tiene más de 1 caracter"]
     )
-    tags: List[Tag] = []
+    tags: List[Tag] = Field(default_factory=list)
     authors: list[Author] = None # En el nuevo python, usar list en lugar de List para tipar los datos, es más usado, además no hace falta importar librerias como Typing
     
     @field_validator("title") # Custom validations | "title" is the data that we want to validate
@@ -82,7 +82,11 @@ class PostCreate(PostBase):
         return value
 
 class PostUpdate(BaseModel):
-    title: str
+    title: str | None = Field(
+            default=None,
+            min_length=3,
+            max_length=30
+        )
     content: Optional[str] = None
 
 class PostPublic(PostBase): # This will be our response model, it's like a map of what we want to return
@@ -106,7 +110,13 @@ def list_posts(query: str | None = Query(default=None, description="Texto para b
 
 # ------------- PATH PARAMETER --------------
 @app.get("/posts/{post_id}", response_model= Union[PostPublic, PostSummary], response_description= "Post encontrado") # Union will let FastAPI validate the two of the response modelss
-def get_post(post_id: int, include_content: bool = Query(default=True, description="Mostrar contenido")):
+def get_post(post_id: int = Path(
+        ...,
+        ge=1,
+        title="ID del post",
+        description="Identificador entero del post. Debe ser mayor a 1",
+        example=1
+    ), include_content: bool = Query(default=True, description="Mostrar contenido")):
     for post in BLOG_POST:
         if post["id"] == post_id:
             if not include_content:
