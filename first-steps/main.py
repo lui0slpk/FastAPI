@@ -9,7 +9,8 @@ To run the app we have two commands:
 
 from fastapi import FastAPI, Query, Body, HTTPException, Path
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Literal
+from math import ceil
 
 app = FastAPI(title="Mini Blog")
 
@@ -96,17 +97,76 @@ class PostSummary(BaseModel): # This will be our response model
     id: int
     title: str
 
+class PaginatedPost(BaseModel):
+    page: int
+    per_page: int
+    total: int
+    total_pages: int
+    has_prev: bool
+    has_next: bool
+    order_by: Literal["id","title"]
+    direction: Literal["asc","desc"]
+    search: str | None = Field(default=None)
+    items: list[PostPublic]
+
 @app.get("/")
 def home():
     return {'message': 'Bienvenidos a Mini Blog por Luis'}
 
 # -------------- QUERY PARAMETER ---------------
-@app.get("/posts", response_model= List[PostPublic]) # Our endpoint will return a PostPublic list with all its attributes
-def list_posts(query: str | None = Query(default=None, description="Texto para buscar por título")):
-    if query:        
-        return [post for post in BLOG_POST if query.lower() in post["title"].lower()] # This will return list, so it's estructure it's the same of PostPublic
+@app.get("/posts", response_model= PaginatedPost)
+def list_posts(query: str | None = Query(
+        default=None,
+        description="Texto para buscar por título",
+        alias="search",
+        max_length=30,
+        pattern=r"^[\w\sáéíóúÁÉÍÓÚüÜ-]+$"
+    ),
+    per_page: int = Query(
+        default=10, ge=1, le=50,
+        description="Numero de resultados (1-50)"
+    ),
+    page: int = Query(
+        default=1, ge=1,
+        description="Número de página (>=1)"
+    ),
+    order_by: Literal["id","title"] = Query(
+        default="id", description="Campo de orden"
+    ),
+    direction: Literal["asc","desc"] = Query(
+        default="asc", description="Dirección de orden (Asc/Desc)"
+    )):
+    
+    results = BLOG_POST
+    
+    if query:
+        results = [post for post in results if query.lower() in post["title"].lower()] # This will return list, so it's estructure it's the same of PostPublic
 
-    return BLOG_POST # Here, we will return a list, as our response model is a PostPublic list
+    total = len(results)
+    total_pages = ceil(total / per_page) if total > 0 else 0
+    if total_pages == 0:
+        current_page = 1
+    else:
+        current_page = min(page, total_pages)
+    
+    results = sorted(results, key=lambda post: post[order_by], reverse=(direction == "desc"))
+    
+    if total_pages == 0:
+        items = []
+    else:
+        start = (current_page - 1) * per_page
+        items = results[start:start + per_page]
+    
+    has_prev = current_page > 1
+    has_next = current_page < total_pages if total_pages > 0 else False
+
+    return PaginatedPost(
+        page=current_page, per_page=per_page,
+        total=total, total_pages=total_pages,
+        has_prev=has_prev, has_next=has_next,
+        order_by=order_by, direction=direction,
+        search=query, items=items
+    )
 
 # ------------- PATH PARAMETER --------------
 @app.get("/posts/{post_id}", response_model= Union[PostPublic, PostSummary], response_description= "Post encontrado") # Union will let FastAPI validate the two of the response modelss

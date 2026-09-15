@@ -11,7 +11,8 @@ A FastAPI app is created with `FastAPI()` and can receive metadata such as the t
 ```python
 from fastapi import FastAPI, Query, Body, HTTPException, Path
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Literal
+from math import ceil
 
 app = FastAPI(title="Mini Blog")
 ```
@@ -69,7 +70,7 @@ class Author(BaseModel):
 class PostBase(BaseModel):
     title: str
     content: str
-    tags: Optional[List[Tag]] = []
+    tags: Optional[List[Tag]] = Field(default_factory=list)
     authors: Optional[List[Author]] = None
 
 class PostCreate(PostBase):
@@ -87,7 +88,7 @@ class PostCreate(PostBase):
         description="Contenido del post (mínimo 1 caracter máx 500)",
         examples=["Este es un contenido válido del post porque tiene más de 1 caracter"]
     )
-    tags: List[Tag] = []
+    tags: List[Tag] = Field(default_factory=list)
     authors: list[Author] = None
 
     @field_validator("title")
@@ -99,7 +100,11 @@ class PostCreate(PostBase):
         return value
 
 class PostUpdate(BaseModel):
-    title: str
+    title: str | None = Field(
+        default=None,
+        min_length=3,
+        max_length=30
+    )
     content: Optional[str] = None
 
 class PostPublic(PostBase):
@@ -108,6 +113,18 @@ class PostPublic(PostBase):
 class PostSummary(BaseModel):
     id: int
     title: str
+
+class PaginatedPost(BaseModel):
+    page: int
+    per_page: int
+    total: int
+    total_pages: int
+    has_prev: bool
+    has_next: bool
+    order_by: Literal["id", "title"]
+    direction: Literal["asc", "desc"]
+    search: str | None = Field(default=None)
+    items: list[PostPublic]
 ```
 
 ### Key ideas
@@ -118,6 +135,7 @@ class PostSummary(BaseModel):
 - `authors` is a list of authors, and each author includes a valid `email`.
 - `PostCreate` inherits from `PostBase` and adds automatic validation with `Field(...)` and custom validation with `@field_validator`.
 - `PostPublic` and `PostSummary` define the expected response structure.
+- `PaginatedPost` contains the page metadata and the list of returned posts.
 
 ### Automatic validations
 
@@ -148,6 +166,7 @@ content: Optional[str] = Field(
 - `min_length=1` prevents empty content.
 - `max_length=500` caps the content length.
 - `EmailStr` validates email addresses automatically.
+- `Field(default_factory=list)` creates an independent empty list for each model instance.
 - `Field` also improves the generated Swagger docs with descriptions and examples.
 
 ### Custom validation example
@@ -183,16 +202,20 @@ This is a custom business rule: even when the data type is valid, the app reject
 
 ---
 
-## 4. Response models
+## 4. Response models and pagination
 
 FastAPI uses `response_model` to define the shape of the API response.
 
 ```python
-@app.get("/posts", response_model=List[PostPublic])
-def list_posts(query: str | None = Query(default=None, description="Texto para buscar por título")):
-    if query:
-        return [post for post in BLOG_POST if query.lower() in post["title"].lower()]
-    return BLOG_POST
+@app.get("/posts", response_model=PaginatedPost)
+def list_posts(
+    query: str | None = Query(default=None, alias="search", max_length=30),
+    per_page: int = Query(default=10, ge=1, le=50),
+    page: int = Query(default=1, ge=1),
+    order_by: Literal["id", "title"] = Query(default="id"),
+    direction: Literal["asc", "desc"] = Query(default="asc")
+):
+    ...
 ```
 
 ```python
@@ -217,41 +240,50 @@ def get_post(
 - It improves Swagger/OpenAPI documentation.
 - It allows different shapes depending on the endpoint logic, such as returning a summary without content.
 - `Path(...)` adds validation on path parameters, for example `ge=1` ensures IDs are positive integers.
+- `PaginatedPost` also reports `total`, `total_pages`, `has_prev`, and `has_next`.
 
 ---
 
-## 5. Query parameters
+## 5. Query parameters and pagination
 
 Query parameters are values sent in the URL after `?`.
 
 ```python
-@app.get("/posts")
-def list_posts(query: str | None = Query(default=None, description="Texto para buscar por título")):
-    if query:
-        results = [post for post in BLOG_POST if query.lower() in post["title"].lower()]
-        return {"data": results, "query": query}
-
-    return {"data": BLOG_POST}
+@app.get("/posts", response_model=PaginatedPost)
+def list_posts(
+    query: str | None = Query(
+        default=None,
+        alias="search",
+        max_length=30,
+        pattern=r"^[\w\sáéíóúÁÉÍÓÚüÜ-]+$"
+    ),
+    per_page: int = Query(default=10, ge=1, le=50),
+    page: int = Query(default=1, ge=1),
+    order_by: Literal["id", "title"] = Query(default="id"),
+    direction: Literal["asc", "desc"] = Query(default="asc")
+):
+    ...
 ```
 
 ### Explanation
 
-- `query` is a nullable string.
-- `Query(...)` lets FastAPI treat it as a query parameter and optionally attach a description.
-- If a user sends `/posts?query=FastAPI`, the API filters the list by matching the title.
-- If no query is provided, it returns the full list.
+- `query` is a nullable string exposed as the `search` query parameter.
+- `max_length=30` and `pattern` validate the search text automatically.
+- `per_page` accepts values from 1 to 50, and `page` must be at least 1.
+- `order_by` only accepts `id` or `title`; `direction` only accepts `asc` or `desc`.
+- The endpoint filters, sorts, slices the results, and returns pagination metadata.
 
 ### Example
 
 ```http
-GET /posts?query=FastAPI
+GET /posts?search=FastAPI&page=1&per_page=10&order_by=title&direction=asc
 ```
 
 This can be used to search by title.
 
 ---
 
-## 5. Path parameters
+## 6. Path parameters
 
 Path parameters are variables included in the URL path.
 
@@ -289,38 +321,48 @@ This demonstrates how to combine path parameters and query parameters in one rou
 
 ---
 
-## 6. POST route: creating a new post
+## 7. POST route: creating a new post
 
 ```python
-@app.post("/posts")
+@app.post("/posts", response_model=PostPublic, response_description="Nuevo post creado")
 def create_post(post: PostCreate):
     new_id = (BLOG_POST[-1]["id"] + 1) if BLOG_POST else 1
-    new_post = {"id": new_id, "title": post.title, "content": post.content}
+    new_post = {
+        "id": new_id,
+        "authors": [author.model_dump() for author in post.authors] if post.authors else None,
+        "title": post.title,
+        "content": post.content,
+        "tags": [tag.model_dump() for tag in post.tags]
+    }
     BLOG_POST.append(new_post)
 
-    return {"message": "Un nuevo post se ha creado", "data": new_post}
+    return new_post
 ```
 
 ### Explanation
 
 - The request body is validated automatically using `PostCreate`.
 - `post.title` and `post.content` are accessed as attributes because the model is converted into an object.
+- `post.tags` and `post.authors` contain nested Pydantic models.
+- `model_dump()` converts each nested model into a dictionary before storing it in the in-memory list.
 - A new ID is generated from the last element in `BLOG_POST`.
 - The new post is appended to the in-memory list.
-- The response returns a message and the new created object.
+- `response_model=PostPublic` controls the structure returned to the client.
 
 ### Example JSON body
 
 ```json
 {
 	"title": "My new post",
-	"content": "This is a new post created with FastAPI"
+	"content": "This is a new post created with FastAPI",
+	"tags": [{ "name": "fastapi" }],
+	"authors": [{ "name": "John Doe", "email": "johndoe@example.com" }]
 }
 ```
 
 ---
 
-## 7. PUT route: update an existing post
+## 8. PUT route: update an existing post
 
 ```python
 @app.put("/posts/{post_id}")
@@ -373,7 +415,7 @@ This raises an HTTP 404 error if the post does not exist.
 
 ---
 
-## 8. DELETE route: removing a resource
+## 9. DELETE route: removing a resource
 
 ```python
 @app.delete("/posts/{post_id}", status_code=204)
@@ -402,7 +444,7 @@ def delete_post(post_id: int):
 
 ---
 
-## 9. `Body(...)` and request-body requirement
+## 10. `Body(...)` and request-body requirement
 
 In FastAPI, `Body(...)` is used to force a body to be required in the request.
 
@@ -421,7 +463,7 @@ In this project, however, the code uses Pydantic models instead, which is cleane
 
 ---
 
-## 10. HTTPException
+## 11. HTTPException
 
 `HTTPException` is used to return an explicit HTTP error.
 
@@ -437,12 +479,12 @@ raise HTTPException(status_code=404, detail="Post no encontrado")
 
 ---
 
-## 11. Summary of the API
+## 12. Summary of the API
 
 This mini app implements a simple blog API with these routes:
 
 - `GET /` → home message
-- `GET /posts` → list all posts or filter by query
+- `GET /posts` → search, sort, and paginate posts
 - `GET /posts/{post_id}` → get one post by id
 - `POST /posts` → create a new post
 - `PUT /posts/{post_id}` → update an existing post
@@ -452,13 +494,17 @@ This is a classic beginner-friendly example of REST API design in FastAPI.
 
 ---
 
-## 12. Study checklist
+## 13. Study checklist
 
 Before moving on, make sure you understand:
 
 - What a FastAPI app is and how routes are defined
 - The difference between `Query`, `Path`, and `Body`
 - How `BaseModel` validates request data
+- How nested models such as `Tag` and `Author` work
+- How `EmailStr` validates email addresses
+- How pagination metadata is calculated and returned
+- How `Literal` restricts ordering options to predefined values
 - Why `model_dump(exclude_unset=True)` is useful for partial updates
 - How `HTTPException` is used for 404 and other errors
 - Why `status_code=204` is used in delete endpoints
