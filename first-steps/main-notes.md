@@ -9,10 +9,32 @@ This file summarizes the logic and patterns used in the FastAPI app in `main.py`
 A FastAPI app is created with `FastAPI()` and can receive metadata such as the title.
 
 ```python
-from fastapi import FastAPI, Query, Body, HTTPException, Path
-from pydantic import BaseModel, EmailStr, Field, field_validator
+import os
+from datetime import datetime
+from fastapi import FastAPI, Query, Body, HTTPException, Path, status, Depends
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from typing import Optional, List, Union, Literal
 from math import ceil
+from sqlalchemy import create_engine, Integer, String, Text, DateTime, select, func
+from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.exc import SQLAlchemyError
+
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./blog.db")
+engine = create_engine(DATABASE_URL, echo=True, future=True, **engine_kwargs)
+SessionLocal = sessionmaker(bind=engine, autoflush=False, class_=Session)
+
+class Base(DeclarativeBase):
+    pass
+
+class PostORM(Base):
+    __tablename__ = "posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[String] = mapped_column(String(100), nullable=False, index=True)
+    content: Mapped[String] = mapped_column(Text, nullable=False)
+    create_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Mini Blog")
 ```
@@ -21,27 +43,46 @@ app = FastAPI(title="Mini Blog")
 
 - `FastAPI()` creates the API application object.
 - `title="Mini Blog"` adds a friendly name in the OpenAPI documentation.
-- The app can later be used to define routes with decorators like `@app.get()` and `@app.post()`.
+- `DATABASE_URL` lets the app connect to a real database instead of a Python list.
+- SQLAlchemy is used to define an ORM model (`PostORM`) and persist data in SQLite.
+- `Depends(get_db)` injects a database session in endpoints.
+- `Base.metadata.create_all(...)` creates the tables in the configured database.
 
 ---
 
-## 2. In-memory database simulation
+## 2. SQLAlchemy and persistence
 
-This project uses a Python list as a simple temporary data store.
+This project now uses a real database through SQLAlchemy, instead of keeping everything only in a Python list.
 
 ```python
-BLOG_POST = [
-    {"id": 1, "title": "Hola desde FastAPI", "content": "Mi primer post"},
-    {"id": 2, "title": "Mi segundo post con FastAPI", "content": "Mi segundo post usando FastAPI"},
-    {"id": 3, "title": "DJango vs FastAPI", "content": "FastAPI es más rápido"},
-]
+class PostORM(Base):
+    __tablename__ = "posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[String] = mapped_column(String(100), nullable=False, index=True)
+    content: Mapped[String] = mapped_column(Text, nullable=False)
+    create_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 ```
 
 ### Why this is useful
 
-- It helps us understand how a REST API works without a database.
-- It is simple and useful for studying CRUD logic.
-- It is a good example of how to manipulate data in memory before connecting to a real database.
+- It allows the app to store data persistently.
+- The database can survive restarts, unlike an in-memory list.
+- It is more realistic for a production API.
+- SQLAlchemy ORM lets us work with Python objects instead of writing raw SQL manually.
+
+### Database session dependency
+
+```python
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+```
+
+This pattern provides a clean database session per request and ensures the connection is closed afterward.
 
 ---
 
@@ -209,11 +250,17 @@ FastAPI uses `response_model` to define the shape of the API response.
 ```python
 @app.get("/posts", response_model=PaginatedPost)
 def list_posts(
-    query: str | None = Query(default=None, alias="search", max_length=30),
+    query: str | None = Query(
+        default=None,
+        alias="search",
+        max_length=30,
+        pattern=r"^[\w\sáéíóúÁÉÍÓÚüÜ-]+$"
+    ),
     per_page: int = Query(default=10, ge=1, le=50),
     page: int = Query(default=1, ge=1),
     order_by: Literal["id", "title"] = Query(default="id"),
-    direction: Literal["asc", "desc"] = Query(default="asc")
+    direction: Literal["asc", "desc"] = Query(default="asc"),
+    db: Session = Depends(get_db)
 ):
     ...
 ```
@@ -324,30 +371,33 @@ This demonstrates how to combine path parameters and query parameters in one rou
 ## 7. POST route: creating a new post
 
 ```python
-@app.post("/posts", response_model=PostPublic, response_description="Nuevo post creado")
-def create_post(post: PostCreate):
-    new_id = (BLOG_POST[-1]["id"] + 1) if BLOG_POST else 1
-    new_post = {
-        "id": new_id,
-        "authors": [author.model_dump() for author in post.authors] if post.authors else None,
-        "title": post.title,
-        "content": post.content,
-        "tags": [tag.model_dump() for tag in post.tags]
-    }
-    BLOG_POST.append(new_post)
+@app.post(
+    "/posts",
+    response_model=PostPublic,
+    response_description="Nuevo post creado",
+    status_code=status.HTTP_201_CREATED
+)
+def create_post(post: PostCreate, db: Session = Depends(get_db)):
+    new_post = PostORM(title=post.title, content=post.content)
 
-    return new_post
+    try:
+        db.add(new_post)
+        db.commit()
+        db.refresh(new_post)
+        return new_post
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error al crear el post")
 ```
 
 ### Explanation
 
 - The request body is validated automatically using `PostCreate`.
-- `post.title` and `post.content` are accessed as attributes because the model is converted into an object.
-- `post.tags` and `post.authors` contain nested Pydantic models.
-- `model_dump()` converts each nested model into a dictionary before storing it in the in-memory list.
-- A new ID is generated from the last element in `BLOG_POST`.
-- The new post is appended to the in-memory list.
-- `response_model=PostPublic` controls the structure returned to the client.
+- `post.title` and `post.content` are converted into a SQLAlchemy ORM object, `PostORM`.
+- `db.add(...)` and `db.commit()` persist the record in the database.
+- `status_code=status.HTTP_201_CREATED` tells FastAPI to return HTTP 201 when creation succeeds.
+- `Depends(get_db)` injects the database session into the endpoint.
+- `response_model=PostPublic` controls what is returned to the client.
 
 ### Example JSON body
 
@@ -359,6 +409,34 @@ def create_post(post: PostCreate):
 	"authors": [{ "name": "John Doe", "email": "johndoe@example.com" }]
 }
 ```
+
+---
+
+## 7.5. Filtering by tags
+
+The app can also filter posts by one or more tags.
+
+```python
+@app.get("/get/by-tags", response_model=list[PostPublic])
+def filter_by_tags(
+    tags: list[str] = Query(
+        min_length=2,
+        description="Una o más etiquetas. Ejemplo: ?tags=python&tags=fastapi",
+    )
+):
+    tags_lower = [tag.lower() for tag in tags]
+
+    return [
+        post for post in BLOG_POST
+        if any(tag["name"].lower() in tags_lower for tag in post.get("tags", []))
+    ]
+```
+
+### Meaning
+
+- `tags` is a list of query values, such as `?tags=python&tags=fastapi`.
+- The route converts them to lowercase and compares them with the tags of each post.
+- This is useful when you want to retrieve posts by category or theme.
 
 ---
 
