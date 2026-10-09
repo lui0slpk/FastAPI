@@ -7,7 +7,7 @@ from app.core.db import Base
 
 if TYPE_CHECKING:
     from .author import AuthorORM
-    from .tag import TagsORM
+    from .tag import TagORM
 
 post_tags = Table(
     "post_tags",
@@ -32,7 +32,7 @@ class PostORM(Base):
     author_id: Mapped[int | None] = mapped_column(ForeignKey("authors.id"))
     author: Mapped[AuthorORM | None] = relationship(back_populates="posts")
 
-    tags: Mapped[List["TagsORM"]] = relationship(
+    tags: Mapped[List["TagORM"]] = relationship(
         secondary=post_tags,
         back_populates="posts",
         lazy="selectin",

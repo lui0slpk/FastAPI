@@ -78,37 +78,37 @@ def list_posts(
     db: Session = Depends(get_db)
 ):
 
-    results = select(PostORM)
+    # results = select(PostORM)
 
-    query = query or text
+    # query = query or text
 
-    if query:
-        results = results.where(PostORM.title.ilike(f"%{query}%"))
+    # if query:
+    #     results = results.where(PostORM.title.ilike(f"%{query}%"))
 
-    total = db.scalar(select(func.count()).select_from(
-        results.subquery())) or 0
-    total_pages = ceil(total / per_page) if total > 0 else 0
+    # total = db.scalar(select(func.count()).select_from(
+    #     results.subquery())) or 0
+    # total_pages = ceil(total / per_page) if total > 0 else 0
 
-    current_page = 1 if total_pages == 0 else min(page, total_pages)
+    # current_page = 1 if total_pages == 0 else min(page, total_pages)
 
-    if order_by == "id":
-        order_col = PostORM.id
-    else:
-        order_col = func.lower(PostORM.title)
+    # if order_by == "id":
+    #     order_col = PostORM.id
+    # else:
+    #     order_col = func.lower(PostORM.title)
 
-    results = results.order_by(
-        order_col.asc() if direction == "asc" else order_col.desc()
-    )
+    # results = results.order_by(
+    #     order_col.asc() if direction == "asc" else order_col.desc()
+    # )
 
-    # results = sorted(
-    #     results, key=lambda post: post[order_by], reverse=(direction == "desc"))
+    # # results = sorted(
+    # #     results, key=lambda post: post[order_by], reverse=(direction == "desc"))
 
-    if total_pages == 0:
-        items: List[PostORM] = []
-    else:
-        start = (current_page - 1) * per_page
-        items = db.execute(results.limit(
-            per_page).offset(start)).scalars().all()
+    # if total_pages == 0:
+    #     items: List[PostORM] = []
+    # else:
+    #     start = (current_page - 1) * per_page
+    #     items = db.execute(results.limit(
+    #         per_page).offset(start)).scalars().all()
 
     has_prev = current_page > 1
     has_next = current_page < total_pages if total_pages > 0 else False
@@ -138,7 +138,7 @@ def get_post(post_id: int = Path(
     example=1
 ), include_content: bool = Query(default=True, description="Mostrar contenido"), db: Session = Depends(get_db)):
 
-    post = db.get(PostORM, post_id)
+    # post = db.get(PostORM, post_id)
 
     if not post:
         raise HTTPException(status_code=404, detail="Post no encontrado")
@@ -157,22 +157,22 @@ def filter_by_tags(
     ),
     db: Session = Depends(get_db)
 ):
-    normalized_tag_names = [tag.strip().lower() for tag in tags if tag.strip()]
+    # normalized_tag_names = [tag.strip().lower() for tag in tags if tag.strip()]
 
-    if not normalized_tag_names:
-        return []
+    # if not normalized_tag_names:
+    #     return []
 
-    post_list = (
-        select(PostORM)
-        .options(
-            selectinload(PostORM.tags),
-            joinedload(PostORM.author),
-        )
-        .where(PostORM.tags.any(func.lower(TagsORM.name).in_(normalized_tag_names)))
-        .order_by(PostORM.id.asc())
-    )
+    # post_list = (
+    #     select(PostORM)
+    #     .options(
+    #         selectinload(PostORM.tags),
+    #         joinedload(PostORM.author),
+    #     )
+    #     .where(PostORM.tags.any(func.lower(TagORM.name).in_(normalized_tag_names)))
+    #     .order_by(PostORM.id.asc())
+    # )
 
-    posts = db.execute(post_list).scalars().all()
+    # posts = db.execute(post_list).scalars().all()
 
     return posts
 
@@ -184,31 +184,31 @@ def filter_by_tags(
     status_code=status.HTTP_201_CREATED
 )
 def create_post(post: PostCreate, db: Session = Depends(get_db)):
-    author_obj = None
+    # author_obj = None
 
-    if post.author:
-        author_obj = db.execute(
-            select(AuthorORM).where(AuthorORM.email == post.author.email)
-        ).scalar_one_or_none()
+    # if post.author:
+    #     author_obj = db.execute(
+    #         select(AuthorORM).where(AuthorORM.email == post.author.email)
+    #     ).scalar_one_or_none()
 
-        if not author_obj:
-            author_obj = AuthorORM(
-                name=post.author.name,
-                email=post.author.email
-            )
-            db.add(author_obj)
-            db.flush()
+    #     if not author_obj:
+    #         author_obj = AuthorORM(
+    #             name=post.author.name,
+    #             email=post.author.email
+    #         )
+    #         db.add(author_obj)
+    #         db.flush()
 
     new_post = PostORM(
         title=post.title, content=post.content, author=author_obj)
 
     for tag in post.tags:
         tag_obj = db.execute(
-            select(TagsORM).where(TagsORM.name.ilike(tag.name))
+            select(TagORM).where(TagORM.name.ilike(tag.name))
         ).scalar_one_or_none()
 
         if not tag_obj:
-            tag_obj = TagsORM(name=tag.name)
+            tag_obj = TagORM(name=tag.name)
             db.add(tag_obj)
             db.flush()
 
