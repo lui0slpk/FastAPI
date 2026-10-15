@@ -1,31 +1,28 @@
 """
 To run the app we have two commands:
 1. Using fastapi:
-    - fastapi dev main.py || This is for development run mode
-    - fastapi run main.py || This is for production run mode
+    - fastapi dev app/main.py || This is for development run mode
+    - fastapi run app/main.py || This is for production run mode
 2. Using uvicorn:
     - uvicorn main:app --reload || Also we can change the run port using "--port 4242"
 """
 
 
-from fastapi import FastAPI, Query, Body, HTTPException, Path, status, Depends
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
-from typing import Optional, List, Union, Literal
-from math import ceil
-from sqlalchemy import Integer, String, Text, DateTime, select, func, UniqueConstraint, ForeignKey, Table, Column
-from sqlalchemy.orm import Session, Mapped, mapped_column, relationship, selectinload, joinedload
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from fastapi import FastAPI
+from app.core.db import Base, engine
 from dotenv import load_dotenv
+from app.api.v1.posts.router import router as post_router
 
 load_dotenv()
 
 
-Base.metadata.create_all(bind=engine)  # dev
+def create_app() -> FastAPI:
+    app = FastAPI(title="Mini Blog")
+    Base.metadata.create_all(bind=engine)  # dev
+
+    app.include_router(post_router)
+
+    return app
 
 
-app = FastAPI(title="Mini Blog")
-
-
-@app.get("/")
-def home():
-    return {'message': 'Bienvenidos a Mini Blog por Luis'}
+app = create_app()
