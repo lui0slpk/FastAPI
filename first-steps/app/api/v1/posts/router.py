@@ -149,7 +149,8 @@ def delete_post(post_id: int, db: Session = Depends(get_db)):
     post = repository.get(post_id)
 
     if not post:
-        raise HTTPException(status_code=404, detail="Post no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Post no encontrado")
 
     try:
         repository.delete_post(post)
