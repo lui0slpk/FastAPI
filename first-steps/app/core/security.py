@@ -41,8 +41,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         playload = decode_token(token)
         sub: str | None = playload.get("sub")
-        username = str | None = playload.get("username")
-        if not sub or username:
+        username: str | None = playload.get("username")
+        if not sub or not username:
             raise credentials_exc
 
         return {
