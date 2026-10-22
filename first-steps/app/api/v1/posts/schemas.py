@@ -52,11 +52,11 @@ class PostBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class PostCreate(PostBase):
+class PostCreate(BaseModel):
     title: str = Field(  # Automatic validations
         ...,
         min_length=3,
-        max_length=30,
+        max_length=100,
         description="Titulo del post (Mínimo 3 carateres, máximo 30)",
         examples=["Mi primer post con FastAPI"]
     )
@@ -69,8 +69,6 @@ class PostCreate(PostBase):
             "Este es un contenido válido del post porque tiene más de 1 caracter"]
     )
     tags: List[Tag] = Field(default_factory=list)
-    # En el nuevo python, usar list en lugar de List para tipar los datos, es más usado, además no hace falta importar librerias como Typing
-    author: Author = None
 
     # Custom validations | "title" is the data that we want to validate
     @field_validator("title")
