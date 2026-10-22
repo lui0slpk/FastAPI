@@ -100,7 +100,7 @@ class PostRepository:
 
         if author:
             author_obj = self.ensure_author(
-                name=author["name"], email=author["email"])
+                name=author["username"], email=author["email"])
 
         post = PostORM(
             title=title, content=content, author=author_obj)
