@@ -16,7 +16,7 @@ router = APIRouter(prefix="/posts", tags=["posts"])
 
 
 @router.get("", response_model=PaginatedPost)
-def list_posts(
+async def list_posts(
     text: str | None = Query(
         default=None,
         deprecated=True,
@@ -68,7 +68,7 @@ def list_posts(
 
 
 @router.get("/by-tags", response_model=list[PostPublic])
-def filter_by_tags(
+async def filter_by_tags(
     tags: list[str] = Query(
         min_length=1,
         description="Una o más etiquetas. Ejemplo: ?tags=python&tags=fastapi",
@@ -81,7 +81,7 @@ def filter_by_tags(
 
 
 @router.get("/{post_id}", response_model=Union[PostPublic, PostSummary], response_description="Post encontrado")
-def get_post(post_id: int = Path(
+async def get_post(post_id: int = Path(
     ...,
     ge=1,
     title="ID del post",
@@ -100,7 +100,7 @@ def get_post(post_id: int = Path(
 
 
 @router.post("", response_model=PostPublic, response_description="Nuevo post creado", status_code=status.HTTP_201_CREATED)
-def create_post(post: PostCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+async def create_post(post: PostCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     repository = PostRepository(db)
 
     try:
@@ -123,7 +123,7 @@ def create_post(post: PostCreate, db: Session = Depends(get_db), user=Depends(ge
 
 
 @router.put("/{post_id}", response_model=PostPublic, response_description="Post actualizado", response_model_exclude_none=True)
-def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+async def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     repository = PostRepository(db)
     post = repository.get(post_id)
 
@@ -147,7 +147,7 @@ def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db), u
 
 # If don't want to return any value, use "status_code=204"
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT, response_description="Post eliminado")
-def delete_post(post_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+async def delete_post(post_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     repository = PostRepository(db)
     post = repository.get(post_id)
 
