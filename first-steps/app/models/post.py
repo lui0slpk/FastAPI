@@ -26,6 +26,7 @@ class PostORM(Base):
     title: Mapped[String] = mapped_column(
         String(100), nullable=False, index=True)
     content: Mapped[String] = mapped_column(Text, nullable=False)
+    image_url: Mapped[String] = mapped_column(String(2048), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow)
 
