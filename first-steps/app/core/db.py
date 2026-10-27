@@ -1,9 +1,8 @@
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session
+from app.core.config import settings
 
-
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./blog.db")
+DATABASE_URL = settings.DATABASE_URL
 
 engine_kwargs = {}
 if DATABASE_URL.startswith("sqlite"):
