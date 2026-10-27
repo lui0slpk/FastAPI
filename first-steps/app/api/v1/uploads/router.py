@@ -2,6 +2,7 @@ import os
 import shutil
 import uuid
 from fastapi import APIRouter, File, UploadFile, HTTPException, status
+from app.services.file_storage import save_uploaded_file
 
 router = APIRouter(prefix="/upload", tags=["uploads"])
 
@@ -9,7 +10,7 @@ MEDIA_DIR = "app/media"
 
 
 @router.post("/bytes")
-async def upload_bytes(file: bytes = File(...)):
+async def upload_bytes(file: bytes = File(...)) -> dict:
     return {
         "filename": "archivo_subido",
         "size_bytes": len(file)
@@ -17,7 +18,7 @@ async def upload_bytes(file: bytes = File(...)):
 
 
 @router.post("/file")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...)) -> dict:
     return {
         "filename": file.filename,
         "content_type": file.content_type
@@ -25,22 +26,11 @@ async def upload_file(file: UploadFile = File(...)):
 
 
 @router.post("/save")
-async def save_file(file: UploadFile = File(...)):
-    if file.content_type not in ["image/png", "image/jpeg"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Solo se permiten imágenes PNG o JPEG"
-        )
-
-    ext = os.path.splitext(file.filename)[-1]
-    filename = f"{uuid.uuid4().hex}{ext}"
-    filepath = os.path.join(MEDIA_DIR, filename)
-
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+async def save_file(file: UploadFile = File(...)) -> dict:
+    saved = save_uploaded_file(file)
 
     return {
-        "filename": filename,
-        "content_type": file.content_type,
-        "url": f"/media/{filename}"
+        "filename": saved["filename"],
+        "content_type": saved["content_type"],
+        "url": saved["url"]
     }
