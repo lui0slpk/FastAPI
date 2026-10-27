@@ -27,7 +27,7 @@ async def upload_file(file: UploadFile = File(...)) -> dict:
 
 @router.post("/save")
 async def save_file(file: UploadFile = File(...)) -> dict:
-    saved = save_uploaded_file(file)
+    saved = await save_uploaded_file(file)
 
     return {
         "filename": saved["filename"],
