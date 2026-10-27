@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Annotated
+from fastapi import Form
 
 not_allowed_words = (
     "idiota",
@@ -48,6 +49,7 @@ class PostBase(BaseModel):
     content: str
     tags: Optional[List[Tag]] = Field(default_factory=list)
     author: Optional[Author] = None
+    image_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -80,6 +82,16 @@ class PostCreate(BaseModel):
                 raise ValueError(
                     f"El título no puede contener la palabra '{word}'")
         return value
+
+    @classmethod
+    def as_form(
+        cls,
+        title: Annotated[str, Form(min_length=3)],
+        content: Annotated[str, Form(min_length=10)],
+        tags: Annotated[list | None, Form()] = None
+    ):
+        tag_objs = [Tag(name=tag) for tag in (tags or [])]
+        return cls(title=title, content=content, tags=tag_objs)
 
 
 class PostUpdate(BaseModel):
