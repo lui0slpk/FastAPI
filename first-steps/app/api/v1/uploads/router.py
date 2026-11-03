@@ -1,7 +1,5 @@
-import os
-import shutil
-import uuid
-from fastapi import APIRouter, File, UploadFile, HTTPException, status
+
+from fastapi import APIRouter, File, UploadFile
 from app.services.file_storage import save_uploaded_file
 
 router = APIRouter(prefix="/upload", tags=["uploads"])
@@ -32,5 +30,9 @@ async def save_file(file: UploadFile = File(...)) -> dict:
     return {
         "filename": saved["filename"],
         "content_type": saved["content_type"],
-        "url": saved["url"]
+        "url": saved["url"],
+        # "size": saved["size"],
+        # "chunk_size_used": saved["chunk_size_used"],
+        # "chunk_calls": saved["chunk_calls"],
+        # "chunk_size": saved["chunk_size"]
     }
