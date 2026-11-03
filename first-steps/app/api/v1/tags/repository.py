@@ -1,3 +1,4 @@
+from pydantic import Tag
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -7,6 +8,18 @@ from app.models.tag import TagORM
 class TagRepository:
     def __init__(self, db: Session):
         self.db = db
+
+    def list_tags(
+        self, search: str | None,
+        order_by: str = "id", direction: str = "asc",
+        page: int = 1, per_page: int = 10
+    ):
+        query = select(TagORM)
+        if search:
+            query = select(TagORM).where(
+                func.lower(TagORM.name).ilike(f"%{search.lower()}%"))
+
+        pass
 
     def create_tag(self, name: str) -> TagORM:
         name = name.strip().lower()
