@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./blog.db"
-    MAX_UPLOAD_MB: int = 5
+    MAX_UPLOAD_MB: int = 10
 
     model_config = SettingsConfigDict(
         env_file=".env",

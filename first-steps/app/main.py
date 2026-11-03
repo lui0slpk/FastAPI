@@ -4,7 +4,7 @@ To run the app we have two commands:
     - fastapi dev app/main.py || This is for development run mode
     - fastapi run app/main.py || This is for production run mode
 2. Using uvicorn:
-    - uvicorn main:app --reload || Also we can change the run port using "--port 4242"
+    - uvicorn app.main:app --reload || Also we can change the run port using "--port 4242"
 """
 
 import os
