@@ -1,9 +1,10 @@
 
 import os
 from datetime import datetime, timedelta, timezone
-from fastapi.security import OAuth2PasswordBearer
-from fastapi import Depends, HTTPException, status
+
 import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 
 SECRET_KEY = os.getenv("SECRET_KEY", "change-my-in-prod")

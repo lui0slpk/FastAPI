@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+
 from app.api.v1.tags.repository import TagRepository
 from app.api.v1.tags.schemas import TagCreate, TagPublic
 from app.core.db import get_db
 from app.core.security import get_current_user
-
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 

@@ -1,8 +1,10 @@
 
-from app.models import PostORM, AuthorORM, TagORM
 from math import ceil
-from sqlalchemy import select, func
-from sqlalchemy.orm import Session, selectinload, joinedload
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, joinedload, selectinload
+
+from app.models import AuthorORM, PostORM, TagORM
 
 
 class PostRepository:

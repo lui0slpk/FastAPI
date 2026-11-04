@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
-from typing import Optional, List, Literal, Annotated
+from typing import Annotated, List, Literal, Optional
+
 from fastapi import Form
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 not_allowed_words = (
     "idiota",

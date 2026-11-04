@@ -8,15 +8,17 @@ To run the app we have two commands:
 """
 
 import os
+
 from fastapi import FastAPI
-# from app.core.config import settings
-from app.core.db import Base, engine
-from app.api.v1.posts.router import router as post_router
-from app.api.v1.auth.router import router as auth_router
-from app.api.v1.uploads.router import router as upload_router
-from app.api.v1.tags.router import router as tag_router
 from fastapi.staticfiles import StaticFiles
 
+from app.api.v1.auth.router import router as auth_router
+from app.api.v1.posts.router import router as post_router
+from app.api.v1.tags.router import router as tag_router
+from app.api.v1.uploads.router import router as upload_router
+
+# from app.core.config import settings
+from app.core.db import Base, engine
 
 MEDIA_DIR = "app/media"
 
