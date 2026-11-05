@@ -22,7 +22,7 @@ credentials_exc = HTTPException(
 
 
 def raise_expired_token():
-    HTTPException(
+    return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Token expirado",
         headers={"WWW-authenticate": "Bearer"}
@@ -30,7 +30,7 @@ def raise_expired_token():
 
 
 def raise_forbidden():
-    HTTPException(
+    return HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="No tienes permisos suficientes"
     )
