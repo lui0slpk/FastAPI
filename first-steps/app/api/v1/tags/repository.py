@@ -1,4 +1,5 @@
-from pydantic import Tag
+from typing import Any
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -15,7 +16,7 @@ class TagRepository:
         self, search: str | None,
         order_by: str = "id", direction: str = "asc",
         page: int = 1, per_page: int = 10
-    ):
+    ) -> dict[TagORM, Any]:
         query = select(TagORM)
         if search:
             query = select(TagORM).where(
@@ -65,7 +66,20 @@ class TagRepository:
 
         return tag_obj
 
+    def get(self, tag_id: int) -> TagORM | None:
+        return self.db.get(TagORM, tag_id)
 
-# class TagRepository(Base):
-#     id: Mapped[Integer] = mapped_column(
-#         Integer, nullable=False, primary_key=True)
+    def update_tag(self, tag: TagORM, name: str) -> TagORM:
+        name = name.lower().strip()
+        tag.name = name
+
+        self.db.add(tag)
+        self.db.flush()
+        self.db.refresh(tag)
+
+        return tag
+
+    def delete_tag(self, tag: TagORM) -> None:
+        self.db.delete(tag)
+
+        return
