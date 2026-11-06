@@ -1,8 +1,20 @@
 from __future__ import annotations
+
 from datetime import datetime
-from typing import List, TYPE_CHECKING
-from sqlalchemy import Integer, String, Text, DateTime, UniqueConstraint, ForeignKey, Table, Column
+from typing import TYPE_CHECKING, List
+
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.core.db import Base
 
 if TYPE_CHECKING:

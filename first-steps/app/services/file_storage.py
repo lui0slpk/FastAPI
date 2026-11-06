@@ -1,9 +1,10 @@
 import os
 import shutil
 import uuid
-from fastapi import UploadFile, HTTPException, status
-from app.core.config import settings
 
+from fastapi import HTTPException, UploadFile, status
+
+from app.core.config import settings
 
 MEDIA_DIR = "app/media"
 ALLOW_EXT = ["image/png", "image/jpeg"]

@@ -1,17 +1,26 @@
 
 from math import ceil
-from fastapi import APIRouter, Query, Depends, Path, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from typing import Literal, Union, Annotated
-from app.core.db import get_db
-from .schemas import (
-    PostPublic, PaginatedPost,
-    PostCreate, PostUpdate, PostSummary
+from typing import Annotated, Literal, Union
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Path,
+    Query,
+    UploadFile,
+    status,
 )
-from .repository import PostRepository
-from app.core.security import oauth2_scheme, get_current_user
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.core.db import get_db
+from app.core.security import get_current_user, oauth2_scheme
 from app.services.file_storage import save_uploaded_file
+
+from .repository import PostRepository
+from .schemas import PaginatedPost, PostCreate, PostPublic, PostSummary, PostUpdate
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 

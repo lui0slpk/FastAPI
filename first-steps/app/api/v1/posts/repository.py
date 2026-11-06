@@ -1,8 +1,10 @@
 
-from app.models import PostORM, AuthorORM, TagORM
 from math import ceil
-from sqlalchemy import select, func
-from sqlalchemy.orm import Session, selectinload, joinedload
+
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session, joinedload, selectinload
+
+from app.models import AuthorORM, PostORM, TagORM
 
 
 class PostRepository:
@@ -82,8 +84,16 @@ class PostRepository:
         return author_obj
 
     def ensure_tag(self, name: str) -> TagORM:
+        name = name.strip().lower()
+
+        # for PostgreSQL
+        # tag_obj = self.db.execute(
+        #     select(TagORM).where(TagORM.name.ilike(name))
+        # ).scalar_one_or_none()
+
+        # for SQLite3
         tag_obj = self.db.execute(
-            select(TagORM).where(TagORM.name.ilike(name))
+            select(TagORM).where(func.lower(TagORM.name) == name)
         ).scalar_one_or_none()
 
         if tag_obj:
@@ -105,8 +115,14 @@ class PostRepository:
         post = PostORM(
             title=title, content=content, image_url=image_url, author=author_obj)
 
-        for tag in tags:
-            tag_obj = self.ensure_tag(tag["name"])
+        names = tags[0]["name"].split(",")
+        for name in names:
+
+            name = name.strip().lower()
+            if not name:
+                continue
+
+            tag_obj = self.ensure_tag(name)
             post.tags.append(tag_obj)
 
         self.db.add(post)
