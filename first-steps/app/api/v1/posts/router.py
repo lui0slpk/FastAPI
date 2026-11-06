@@ -59,21 +59,10 @@ async def list_posts(
 
     query = query or text
 
-    total, items = repository.search(
-        query, order_by, direction, page, per_page)
-
-    total_pages = ceil(total / per_page) if total > 0 else 0
-    current_page = 1 if total_pages == 0 else min(page, total_pages)
-
-    has_prev = current_page > 1
-    has_next = current_page < total_pages if total_pages > 0 else False
-
-    return PaginatedPost(
-        page=current_page, per_page=per_page,
-        total=total, total_pages=total_pages,
-        has_prev=has_prev, has_next=has_next,
-        order_by=order_by, direction=direction,
-        search=query, items=items
+    return repository.lists_posts(
+        search=query, page=page,
+        per_page=per_page, order_by=order_by,
+        direction=direction
     )
 
 
