@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -12,11 +14,29 @@ router = APIRouter(prefix="/tags", tags=["tags"])
 
 @router.get("", response_model=dict, status_code=status.HTTP_200_OK, description="Tag list pagination")
 def list_tags(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(10, ge=1, le=50),
-    order_by: str = Query("id", pattern="^(id|name)$"),
-    direction: str = Query("asc", pattern="^(asc|desc)$"),
-    search: str | None = Query(None),
+    page: int = Query(
+        default=1, ge=1,
+        description="Número de página (>=1)"
+    ),
+    per_page: int = Query(
+        default=10, ge=1, le=50,
+        description="Numero de resultados (1-50)"
+    ),
+    order_by: Literal["id", "name"] = Query(
+        default="id", pattern="^(id|name)$",
+        description="Campo de orden"
+    ),
+    direction: Literal["asc", "desc"] = Query(
+        default="asc", pattern="^(asc|desc)$",
+        description="Dirección de orden (Asc/Desc)"
+    ),
+    search: str | None = Query(
+        default=None,
+        description="Texto para buscar por título",
+        alias="search",
+        max_length=30,
+        pattern=r"^[\w\sáéíóúÁÉÍÓÚüÜ-]+$"
+    ),
     db: Session = Depends(get_db)
 ):
     repository = TagRepository(db)
